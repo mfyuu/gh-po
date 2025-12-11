@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -33,6 +35,8 @@ var (
 )
 
 func main() {
+	openWeb := parseFlags()
+
 	var prs []PullRequest
 	var stderr string
 	var listErr error
@@ -69,6 +73,13 @@ func main() {
 	if err := checkoutPR(selected); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
+	}
+
+	if openWeb {
+		if err := browsePR(selected); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 	}
 }
 
@@ -234,5 +245,22 @@ func checkoutPR(pr PullRequest) error {
 		return fmt.Errorf("failed to checkout PR #%d: %w", pr.Number, execErr)
 	}
 
+	return nil
+}
+
+func parseFlags() bool {
+	web := flag.Bool("web", false, "Open the PR in the browser after checkout")
+	flag.Parse()
+	return *web
+}
+
+func browsePR(pr PullRequest) error {
+	fmt.Println()
+	cmd := exec.Command("gh", "browse", strconv.Itoa(pr.Number))
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to open PR #%d in browser: %w", pr.Number, err)
+	}
 	return nil
 }
