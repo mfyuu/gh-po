@@ -54,7 +54,7 @@ func main() {
 	}
 
 	if len(prs) == 0 {
-		// gh pr listはTTYモードでのみメッセージを出力するため、自前で出力
+		// gh pr list only outputs message in TTY mode, so we print it ourselves
 		repo := getRepoName()
 		if repo != "" {
 			fmt.Printf("no open pull requests in %s\n", repo)
@@ -70,7 +70,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// --view: ブラウザのみ（checkout しない）
+	// --view: open in browser only (without checkout)
 	if f.view {
 		if err := browsePR(selected, false); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -84,7 +84,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// --web: checkout 後にブラウザも開く
+	// --web: open in browser after checkout
 	if f.web {
 		if err := browsePR(selected, true); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -116,7 +116,7 @@ func getRepoName() string {
 }
 
 func selectPR(prs []PullRequest) (PullRequest, error) {
-	// カラム幅を計算（表示幅ベース）
+	// Calculate column widths based on display width
 	maxIDWidth := 2
 	maxTitleWidth := 5
 	maxBranchWidth := 6
@@ -141,7 +141,7 @@ func selectPR(prs []PullRequest) (PullRequest, error) {
 		}
 	}
 
-	// 最大幅を制限
+	// Limit maximum widths
 	if maxTitleWidth > 100 {
 		maxTitleWidth = 100
 	}
@@ -155,7 +155,7 @@ func selectPR(prs []PullRequest) (PullRequest, error) {
 		options[i] = huh.NewOption(label, pr)
 	}
 
-	// ヘッダーを構築
+	// Build header
 	header := buildHeader(maxIDWidth, maxTitleWidth, maxBranchWidth, maxCreatedWidth)
 
 	var selected PullRequest
@@ -177,13 +177,13 @@ func selectPR(prs []PullRequest) (PullRequest, error) {
 }
 
 func buildHeader(idWidth, titleWidth, branchWidth, createdWidth int) string {
-	// 各ラベルにアンダーライン、余白にはアンダーラインなし
+	// Underline each label, no underline for padding
 	idLabel := underlineStyle.Render(runewidth.FillRight("ID", idWidth))
 	titleLabel := underlineStyle.Render(runewidth.FillRight("TITLE", titleWidth))
 	branchLabel := underlineStyle.Render(runewidth.FillRight("BRANCH", branchWidth))
 	createdLabel := underlineStyle.Render(runewidth.FillRight("CREATED AT", createdWidth))
 
-	// 先頭2スペース（カーソル分）+ 各ラベルを余白で連結
+	// 2 leading spaces (for cursor) + labels separated by spaces
 	return fmt.Sprintf("  %s  %s  %s  %s", idLabel, titleLabel, branchLabel, createdLabel)
 }
 
@@ -195,7 +195,7 @@ func styleID(pr PullRequest) string {
 }
 
 func formatPR(pr PullRequest, idWidth, titleWidth, branchWidth, createdWidth int) string {
-	// ID (色付き)
+	// ID (colored)
 	idStr := fmt.Sprintf("#%d", pr.Number)
 	paddedID := runewidth.FillRight(idStr, idWidth)
 	var styledID string
@@ -205,14 +205,14 @@ func formatPR(pr PullRequest, idWidth, titleWidth, branchWidth, createdWidth int
 		styledID = greenStyle.Render(paddedID)
 	}
 
-	// タイトル（切り詰め & パディング）
+	// Title (truncate & pad)
 	title := pr.Title
 	if runewidth.StringWidth(title) > titleWidth {
 		title = runewidth.Truncate(title, titleWidth-1, "…")
 	}
 	paddedTitle := runewidth.FillRight(title, titleWidth)
 
-	// ブランチ（色付き、切り詰め & パディング）
+	// Branch (colored, truncate & pad)
 	branch := pr.HeadRefName
 	if runewidth.StringWidth(branch) > branchWidth {
 		branch = runewidth.Truncate(branch, branchWidth-1, "…")
@@ -220,7 +220,7 @@ func formatPR(pr PullRequest, idWidth, titleWidth, branchWidth, createdWidth int
 	paddedBranch := runewidth.FillRight(branch, branchWidth)
 	styledBranch := cyanStyle.Render(paddedBranch)
 
-	// 相対時間（about を追加 & パディング）
+	// Relative time (add "about" prefix & pad)
 	created := "about " + humanize.Time(pr.CreatedAt)
 	paddedCreated := runewidth.FillRight(created, createdWidth)
 
@@ -228,7 +228,7 @@ func formatPR(pr PullRequest, idWidth, titleWidth, branchWidth, createdWidth int
 }
 
 func checkoutPR(pr PullRequest) error {
-	// 選択されたPR情報を表示
+	// Display selected PR info
 	styledBranch := cyanStyle.Render(pr.HeadRefName)
 	fmt.Printf("%s  %s  %s\n\n", styleID(pr), pr.Title, styledBranch)
 
