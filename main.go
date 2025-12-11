@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/huh"
@@ -49,8 +50,13 @@ func main() {
 	}
 
 	if len(prs) == 0 {
-		stdout, _, _ := gh.Exec("pr", "list")
-		fmt.Print(stdout.String())
+		// gh pr listはTTYモードでのみメッセージを出力するため、自前で出力
+		repo := getRepoName()
+		if repo != "" {
+			fmt.Printf("no open pull requests in %s\n", repo)
+		} else {
+			fmt.Println("no open pull requests")
+		}
 		return
 	}
 
@@ -78,6 +84,14 @@ func listPRs() ([]PullRequest, string, error) {
 	}
 
 	return prs, "", nil
+}
+
+func getRepoName() string {
+	stdout, _, err := gh.Exec("repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(stdout.String())
 }
 
 func selectPR(prs []PullRequest) (PullRequest, error) {
