@@ -1,5 +1,7 @@
 A lightweight GitHub CLI extension that provides an interactive PR selector for seamless checkout and browser viewing.
 
+![demo](https://github.com/user-attachments/assets/e7584db8-da33-4be6-b113-8aeff6b9bdcb)
+
 ## Overview
 
 `gh-po` (PR + Checkout) streamlines the process of viewing and checking out pull requests. It displays all available pull requests in an interactive selection UI, allowing you to quickly checkout any PR or open it in your browser.
