@@ -35,7 +35,7 @@ var (
 )
 
 func main() {
-	openWeb := parseFlags()
+	f := parseFlags()
 
 	var prs []PullRequest
 	var stderr string
@@ -70,13 +70,23 @@ func main() {
 		os.Exit(1)
 	}
 
+	// --view: ブラウザのみ（checkout しない）
+	if f.view {
+		if err := browsePR(selected, false); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	if err := checkoutPR(selected); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
-	if openWeb {
-		if err := browsePR(selected); err != nil {
+	// --web: checkout 後にブラウザも開く
+	if f.web {
+		if err := browsePR(selected, true); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
@@ -248,14 +258,25 @@ func checkoutPR(pr PullRequest) error {
 	return nil
 }
 
-func parseFlags() bool {
-	web := flag.Bool("web", false, "Open the PR in the browser after checkout")
-	flag.Parse()
-	return *web
+type flags struct {
+	web  bool
+	view bool
 }
 
-func browsePR(pr PullRequest) error {
-	fmt.Println()
+func parseFlags() flags {
+	var f flags
+	flag.BoolVar(&f.web, "web", false, "Open the PR in browser after checkout")
+	flag.BoolVar(&f.web, "w", false, "Open the PR in browser after checkout (shorthand)")
+	flag.BoolVar(&f.view, "view", false, "Open the PR in browser without checkout")
+	flag.BoolVar(&f.view, "v", false, "Open the PR in browser without checkout (shorthand)")
+	flag.Parse()
+	return f
+}
+
+func browsePR(pr PullRequest, withNewline bool) error {
+	if withNewline {
+		fmt.Println()
+	}
 	cmd := exec.Command("gh", "browse", strconv.Itoa(pr.Number))
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
