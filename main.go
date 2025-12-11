@@ -1,26 +1,224 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"strconv"
+	"time"
 
-	"github.com/cli/go-gh/v2/pkg/api"
+	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/huh/spinner"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/cli/go-gh/v2"
+	"github.com/dustin/go-humanize"
+	"github.com/mattn/go-runewidth"
+)
+
+type PullRequest struct {
+	Number      int       `json:"number"`
+	Title       string    `json:"title"`
+	HeadRefName string    `json:"headRefName"`
+	IsDraft     bool      `json:"isDraft"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
+var (
+	greenStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
+	yellowStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+	cyanStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("6"))
+	grayStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+	underlineStyle = lipgloss.NewStyle().Underline(true).Foreground(lipgloss.Color("7"))
 )
 
 func main() {
-	fmt.Println("hi world, this is the gh-po extension!")
-	client, err := api.DefaultRESTClient()
-	if err != nil {
-		fmt.Println(err)
+	var prs []PullRequest
+	var stderr string
+	var listErr error
+
+	_ = spinner.New().
+		Title("Loading pull requests...").
+		Action(func() {
+			prs, stderr, listErr = listPRs()
+		}).
+		Run()
+
+	if listErr != nil {
+		fmt.Fprint(os.Stderr, stderr)
+		os.Exit(1)
+	}
+
+	if len(prs) == 0 {
+		stdout, _, _ := gh.Exec("pr", "list")
+		fmt.Print(stdout.String())
 		return
 	}
-	response := struct {Login string}{}
-	err = client.Get("user", &response)
+
+	selected, err := selectPR(prs)
 	if err != nil {
-		fmt.Println(err)
-		return
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
 	}
-	fmt.Printf("running as %s\n", response.Login)
+
+	if err := checkoutPR(selected); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
 }
 
-// For more examples of using go-gh, see:
-// https://github.com/cli/go-gh/blob/trunk/example_gh_test.go
+func listPRs() ([]PullRequest, string, error) {
+	stdout, stderr, err := gh.Exec("pr", "list", "--json", "number,title,headRefName,isDraft,createdAt")
+	if err != nil {
+		return nil, stderr.String(), err
+	}
+
+	var prs []PullRequest
+	if err := json.Unmarshal(stdout.Bytes(), &prs); err != nil {
+		return nil, "", fmt.Errorf("failed to parse PR list: %w", err)
+	}
+
+	return prs, "", nil
+}
+
+func selectPR(prs []PullRequest) (PullRequest, error) {
+	// カラム幅を計算（表示幅ベース）
+	maxIDWidth := 2
+	maxTitleWidth := 5
+	maxBranchWidth := 6
+	maxCreatedWidth := 10 // "CREATED AT"
+
+	for _, pr := range prs {
+		idWidth := runewidth.StringWidth(fmt.Sprintf("#%d", pr.Number))
+		if idWidth > maxIDWidth {
+			maxIDWidth = idWidth
+		}
+		titleWidth := runewidth.StringWidth(pr.Title)
+		if titleWidth > maxTitleWidth {
+			maxTitleWidth = titleWidth
+		}
+		branchWidth := runewidth.StringWidth(pr.HeadRefName)
+		if branchWidth > maxBranchWidth {
+			maxBranchWidth = branchWidth
+		}
+		createdWidth := runewidth.StringWidth("about " + humanize.Time(pr.CreatedAt))
+		if createdWidth > maxCreatedWidth {
+			maxCreatedWidth = createdWidth
+		}
+	}
+
+	// 最大幅を制限
+	if maxTitleWidth > 100 {
+		maxTitleWidth = 100
+	}
+	if maxBranchWidth > 30 {
+		maxBranchWidth = 30
+	}
+
+	options := make([]huh.Option[PullRequest], len(prs))
+	for i, pr := range prs {
+		label := formatPR(pr, maxIDWidth, maxTitleWidth, maxBranchWidth, maxCreatedWidth)
+		options[i] = huh.NewOption(label, pr)
+	}
+
+	// ヘッダーを構築
+	header := buildHeader(maxIDWidth, maxTitleWidth, maxBranchWidth, maxCreatedWidth)
+
+	var selected PullRequest
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[PullRequest]().
+				Title("Select a PR to checkout").
+				Description(header).
+				Options(options...).
+				Value(&selected),
+		),
+	)
+
+	if err := form.Run(); err != nil {
+		return PullRequest{}, fmt.Errorf("selection cancelled: %w", err)
+	}
+
+	return selected, nil
+}
+
+func buildHeader(idWidth, titleWidth, branchWidth, createdWidth int) string {
+	// 各ラベルにアンダーライン、余白にはアンダーラインなし
+	idLabel := underlineStyle.Render(runewidth.FillRight("ID", idWidth))
+	titleLabel := underlineStyle.Render(runewidth.FillRight("TITLE", titleWidth))
+	branchLabel := underlineStyle.Render(runewidth.FillRight("BRANCH", branchWidth))
+	createdLabel := underlineStyle.Render(runewidth.FillRight("CREATED AT", createdWidth))
+
+	// 先頭2スペース（カーソル分）+ 各ラベルを余白で連結
+	return fmt.Sprintf("  %s  %s  %s  %s", idLabel, titleLabel, branchLabel, createdLabel)
+}
+
+func styleID(pr PullRequest) string {
+	if pr.IsDraft {
+		return yellowStyle.Render(fmt.Sprintf("#%d", pr.Number))
+	}
+	return greenStyle.Render(fmt.Sprintf("#%d", pr.Number))
+}
+
+func formatPR(pr PullRequest, idWidth, titleWidth, branchWidth, createdWidth int) string {
+	// ID (色付き)
+	idStr := fmt.Sprintf("#%d", pr.Number)
+	paddedID := runewidth.FillRight(idStr, idWidth)
+	var styledID string
+	if pr.IsDraft {
+		styledID = yellowStyle.Render(paddedID)
+	} else {
+		styledID = greenStyle.Render(paddedID)
+	}
+
+	// タイトル（切り詰め & パディング）
+	title := pr.Title
+	if runewidth.StringWidth(title) > titleWidth {
+		title = runewidth.Truncate(title, titleWidth-1, "…")
+	}
+	paddedTitle := runewidth.FillRight(title, titleWidth)
+
+	// ブランチ（色付き、切り詰め & パディング）
+	branch := pr.HeadRefName
+	if runewidth.StringWidth(branch) > branchWidth {
+		branch = runewidth.Truncate(branch, branchWidth-1, "…")
+	}
+	paddedBranch := runewidth.FillRight(branch, branchWidth)
+	styledBranch := cyanStyle.Render(paddedBranch)
+
+	// 相対時間（about を追加 & パディング）
+	created := "about " + humanize.Time(pr.CreatedAt)
+	paddedCreated := runewidth.FillRight(created, createdWidth)
+
+	return fmt.Sprintf("%s  %s  %s  %s", styledID, paddedTitle, styledBranch, grayStyle.Render(paddedCreated))
+}
+
+func checkoutPR(pr PullRequest) error {
+	// 選択されたPR情報を表示
+	styledBranch := cyanStyle.Render(pr.HeadRefName)
+	fmt.Printf("%s  %s  %s\n\n", styleID(pr), pr.Title, styledBranch)
+
+	var stdoutStr, stderrStr string
+	var execErr error
+
+	_ = spinner.New().
+		Title("Checking out PR...").
+		Action(func() {
+			stdout, stderr, err := gh.Exec("pr", "checkout", strconv.Itoa(pr.Number))
+			stdoutStr = stdout.String()
+			stderrStr = stderr.String()
+			execErr = err
+		}).
+		Run()
+
+	if stdoutStr != "" {
+		fmt.Print(stdoutStr)
+	}
+	if stderrStr != "" {
+		fmt.Print(stderrStr)
+	}
+	if execErr != nil {
+		return fmt.Errorf("failed to checkout PR #%d: %w", pr.Number, execErr)
+	}
+
+	return nil
+}
