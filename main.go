@@ -264,11 +264,30 @@ type flags struct {
 }
 
 func parseFlags() flags {
+	flag.Usage = func() {
+		fmt.Print(`Interactively select and checkout a pull request.
+Optionally open the PR in the browser.
+
+USAGE
+  gh po [flags]
+
+FLAGS
+  -w, --web     Open the PR in browser after checkout
+  -v, --view    Open the PR in browser without checkout
+  --help        Show help for command
+
+EXAMPLES
+  $ gh po              # Checkout only
+  $ gh po --web        # Checkout and open in browser
+  $ gh po --view       # Open in browser without checkout
+`)
+	}
+
 	var f flags
-	flag.BoolVar(&f.web, "web", false, "Open the PR in browser after checkout")
-	flag.BoolVar(&f.web, "w", false, "Open the PR in browser after checkout (shorthand)")
-	flag.BoolVar(&f.view, "view", false, "Open the PR in browser without checkout")
-	flag.BoolVar(&f.view, "v", false, "Open the PR in browser without checkout (shorthand)")
+	flag.BoolVar(&f.web, "web", false, "")
+	flag.BoolVar(&f.web, "w", false, "")
+	flag.BoolVar(&f.view, "view", false, "")
+	flag.BoolVar(&f.view, "v", false, "")
 	flag.Parse()
 	return f
 }
