@@ -42,7 +42,7 @@ func main() {
 	var listErr error
 
 	_ = spinner.New().
-		Title("Loading pull requests...").
+		Title("Fetching pull requests...").
 		Action(func() {
 			prs, stderr, listErr = listPRs()
 		}).

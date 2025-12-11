@@ -4,7 +4,9 @@ A lightweight GitHub CLI extension that provides an interactive PR selector for 
 
 ## Overview
 
-`gh-po` (PR + Checkout) streamlines the process of viewing and checking out pull requests. It displays all available pull requests in an interactive selection UI, allowing you to quickly checkout any PR or open it in your browser.
+`gh-po` = `gh pr list` + `gh pr checkout`, optionally `gh pr view --web`
+
+Streamlines the process of viewing and checking out pull requests. It displays all available pull requests in an interactive selection UI, allowing you to quickly checkout any PR or open it in your browser.
 
 Built with [golang/go](https://github.com/golang/go), this extension uses [charmbracelet/huh](https://github.com/charmbracelet/huh) for interactive selection.
 
@@ -15,6 +17,7 @@ When working with multiple pull requests, developers often need to:
 1. Run `gh pr list` to see available PRs
 2. Identify the PR number they want to work on
 3. Run `gh pr checkout <number>` to switch to that PR
+4. (Optionally) Run `gh pr view --web` to open the PR in browser
 
 This extension combines these steps into a single command with an interactive interface, reducing context switching and making PR management more efficient. The arrow-key navigation makes it easy to quickly jump between different pull requests during code reviews or when switching between multiple work streams.
 
@@ -27,7 +30,7 @@ This extension combines these steps into a single command with an interactive in
 ### Install as a GitHub CLI extension
 
 ```bash
-gh extension install mfyuu/gh-po
+gh extensions install mfyuu/gh-po
 ```
 
 ## Usage
