@@ -161,7 +161,7 @@ func selectPR(prs []PullRequest) (PullRequest, bool) {
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[PullRequest]().
-				Title("Select a PR to checkout").
+				Title("Select a PR to checkout:").
 				Description(header).
 				Options(options...).
 				Value(&selected),
