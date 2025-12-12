@@ -64,10 +64,9 @@ func main() {
 		return
 	}
 
-	selected, err := selectPR(prs)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+	selected, ok := selectPR(prs)
+	if !ok {
+		return
 	}
 
 	// --view: open in browser only (without checkout)
@@ -115,7 +114,7 @@ func getRepoName() string {
 	return strings.TrimSpace(stdout.String())
 }
 
-func selectPR(prs []PullRequest) (PullRequest, error) {
+func selectPR(prs []PullRequest) (PullRequest, bool) {
 	// Calculate column widths based on display width
 	maxIDWidth := 2
 	maxTitleWidth := 5
@@ -170,10 +169,11 @@ func selectPR(prs []PullRequest) (PullRequest, error) {
 	)
 
 	if err := form.Run(); err != nil {
-		return PullRequest{}, fmt.Errorf("selection cancelled: %w", err)
+		fmt.Fprintln(os.Stderr, grayStyle.Render("Operation cancelled."))
+		return PullRequest{}, false
 	}
 
-	return selected, nil
+	return selected, true
 }
 
 func buildHeader(idWidth, titleWidth, branchWidth, createdWidth int) string {
